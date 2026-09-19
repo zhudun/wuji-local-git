@@ -3,157 +3,94 @@
 ## 目录结构
 
 ```
-wuji-local-git/                       ← 整个项目根目录，Git 管理
+wuji-local-git/
 │
-├── repos/                            ← 【临时区】无极下载的项目放这里（gitignore 忽略）
-│   ├── my-app-0919/                  ←   第 1 次从无极下载
-│   ├── my-app-0920/                  ←   第 2 次从无极下载
-│   └── another-project-0921/         ←   另一个项目也可以放这里
+├── repos/                     ← 【临时区】无极下载的项目放这里（Git 忽略）
+│   ├── my-app-0919/
+│   ├── my-app-0920/
+│   └── ...
 │
-├── （你的业务代码文件）                ← 【正式区】同步过来的代码，Git 跟踪
+├── project/                   ← 【正式区】同步目标，业务代码在这里（Git 跟踪）
 │   ├── src/
 │   ├── package.json
 │   └── ...
 │
-├── wuji-sync.sh                      ← 从 repos/ 拉代码到正式区
-├── wuji-push.sh                      ← 从正式区推代码回 repos/
-├── QUICKSTART.md                     ← 本文件
+├── wuji-sync.sh / .cmd        ← 拉：repos/xxx → project/
+├── wuji-push.sh / .cmd        ← 推：project/ → repos/xxx
 ├── README.md
+├── QUICKSTART.md
 ├── .cursorrules
 ├── AI-GUIDE.md
-├── .gitignore                        ← 已配置忽略 repos/*
+├── .gitignore
 └── .wuji-sync-ignore
 ```
 
-**两个区域：**
-- `repos/` = 临时区，放无极下载的原始代码，Git 不跟踪
-- 根目录其余部分 = 正式区，同步过来的业务代码，Git 跟踪
+**根目录很清爽：** 只有 `repos/`、`project/` 两个子目录 + 工具文件，不会混杂。
 
 ---
 
-## 操作流程
+## 日常操作（只需记住两条命令）
 
-### 第一步：从无极下载代码到 repos/
-
-从无极平台下载（或链接）代码时，把目标文件夹放在 `repos/` 下面：
-
-```
-repos/my-app-0919/
-├── src/
-├── package.json
-└── ...
-```
-
-### 第二步：同步到正式区
+### 从无极拉代码
 
 ```bash
-# 同步并自动提交（指定 repos 下的具体项目）
-bash wuji-sync.sh repos/my-app-0919 --commit
-
-# 或者先预览再决定
-bash wuji-sync.sh repos/my-app-0919 --dry-run
+./wuji-sync.sh repos/20260919001 --commit
 ```
 
-### 第三步：在正式区开发
+效果：`repos/20260919001/` 的内容 → 复制到 `project/` → 自动 git commit
 
-用 VS Code 打开项目根目录，直接编辑同步过来的业务代码：
+### 推代码回无极
 
 ```bash
-code .
+./wuji-push.sh repos/20260919001 --changed
+```
 
-# 改完提交
+效果：最近提交修改的文件从 `project/` → 复制回 `repos/20260919001/`
+
+---
+
+## 完整流程示例
+
+```bash
+# 1. 无极下载代码到 repos/ 下
+#    （把无极链接目标设为 repos/20260919001）
+
+# 2. 同步到 project/
+./wuji-sync.sh repos/20260919001 --commit
+
+# 3. 在 project/ 里开发（VS Code 打开根目录即可）
+#    改完后提交
 git add -A
 git commit -m "feat: 新增XX功能"
-```
-
-### 第四步：推回无极
-
-```bash
-# 只推最近改过的文件（推荐）
-bash wuji-push.sh repos/my-app-0919 --changed
-
-# 或全量同步
-bash wuji-push.sh repos/my-app-0919
-```
-
----
-
-## 下次连接无极（新文件夹）
-
-无极断开后重新连接，会生成新文件夹，放进 repos 就行：
-
-```bash
-# 昨天是 repos/my-app-0919
-# 今天变成 repos/my-app-0920，没关系
-
-bash wuji-sync.sh repos/my-app-0920 --commit
-# Git 仓库自动对比差异，记录变更
-```
-
-旧的临时文件夹可以随时删：
-
-```bash
-rm -rf repos/my-app-0919
-```
-
----
-
-## 一天的完整示例
-
-```bash
-# 1. 从无极下载代码到 repos/
-#    （无极链接到 repos/dashboard-0919/）
-
-# 2. 同步到 Git 仓库
-bash wuji-sync.sh repos/dashboard-0919 --commit
-
-# 3. 开发...
-git add -A && git commit -m "feat: 新增报表页面"
-git add -A && git commit -m "fix: 修复筛选条件bug"
 
 # 4. 推回无极
-bash wuji-push.sh repos/dashboard-0919 --changed
+./wuji-push.sh repos/20260919001 --changed
 
-# 5. 清理旧的临时文件夹（可选）
-rm -rf repos/dashboard-0918
-
-# 6. 备份（可选）
-git bundle create backup-$(date +%Y%m%d).bundle --all
+# 5. 下次无极生成新文件夹，放到 repos/ 下，换个名字就行
+./wuji-sync.sh repos/20260920001 --commit
 ```
 
 ---
 
-## 提交信息建议
+## 预览模式
+
+不确定会做什么？加 `--dry-run`：
 
 ```bash
-git commit -m "sync: 从无极同步代码"          # 同步时（--commit 自动生成）
-git commit -m "feat: 新增XX功能"              # 新增功能
-git commit -m "fix: 修复XX问题"               # 修 bug
-git commit -m "style: 调整XX页面样式"          # 改样式
-git commit -m "refactor: 重构XX模块"           # 重构
+./wuji-sync.sh repos/20260919001 --dry-run
+./wuji-push.sh repos/20260919001 --dry-run
 ```
 
 ---
 
-## 常见问题
+## Windows 用户
 
-### Q: repos/ 里可以放多个项目吗？
-
-可以，但同步到正式区时一次只同步一个。根目录的正式区是一个项目的代码。如果你有多个无极项目需要管理，建议 clone 多份本仓库，每份管理一个项目。
-
-### Q: repos/ 会越来越大吗？
-
-会，因为每次下载是一个新文件夹。旧的用完随时删就行，反正代码已经同步到 Git 里了。
-
-### Q: 可以自动同步吗？
-
-不建议。手动更安全——避免编辑中的文件被覆盖，也能控制每次提交的粒度。
-
-### Q: Git Bash 路径怎么写？
+在 **Git Bash** 中运行脚本，或者用 `.cmd` 包装在 PowerShell / cmd 中运行：
 
 ```
-Windows 路径              Git Bash 路径
-C:\Users\xxx\folder   →  /c/Users/xxx/folder
-D:\projects\repo      →  /d/projects/repo
-repos\my-app-0919     →  repos/my-app-0919（相对路径直接用）
+# Git Bash
+./wuji-sync.sh repos/20260919001 --commit
+
+# PowerShell / cmd
+wuji-sync.cmd repos\20260919001 --commit
 ```

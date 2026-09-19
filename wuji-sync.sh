@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# wuji-sync.sh — 将无极平台下载的代码同步到本 Git 仓库
+# wuji-sync.sh — 将无极平台下载的代码同步到 project/ 目录
 #
 # 用法:
 #   ./wuji-sync.sh repos/my-project          # 同步并查看 diff
@@ -11,6 +11,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_DIR="$SCRIPT_DIR"
+PROJECT_DIR="$SCRIPT_DIR/project"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -23,15 +24,18 @@ usage() {
 ${CYAN}wuji-sync.sh${NC} — 无极平台代码同步工具
 
 ${YELLOW}用法:${NC}
-  $0 <无极下载目录>              同步代码，查看变更
-  $0 <无极下载目录> --commit     同步代码并自动提交
-  $0 <无极下载目录> --dry-run    仅预览将同步的文件，不实际操作
+  $0 <无极下载目录>              同步代码到 project/，查看变更
+  $0 <无极下载目录> --commit     同步并自动提交
+  $0 <无极下载目录> --dry-run    仅预览，不实际操作
   $0 --help                     显示帮助
 
 ${YELLOW}示例:${NC}
   $0 repos/my-app-0919
   $0 repos/my-app-0919 --commit
   $0 repos/my-app-0919 --dry-run
+
+${YELLOW}同步方向:${NC}
+  repos/<临时项目>  ──→  project/
 EOF
 }
 
@@ -71,8 +75,10 @@ main() {
         exit 1
     fi
 
+    mkdir -p "$PROJECT_DIR"
+
     log_info "源目录 (无极下载): $source_dir"
-    log_info "目标仓库:          $REPO_DIR"
+    log_info "目标目录:          $PROJECT_DIR"
     echo ""
 
     if $dry_run; then
@@ -91,23 +97,23 @@ main() {
             -not -path "*/.git/*" \
             | wc -l | tr -d ' ')"
         echo ""
-        log_info "共 $total 个文件。（仅显示前 50 个）"
+        log_info "共 $total 个文件将同步到 project/ 目录。（仅显示前 50 个）"
         exit 0
     fi
 
-    log_info "正在同步文件..."
+    log_info "正在同步文件到 project/ ..."
 
     local items=0
+
     for item in "$source_dir"/*; do
         [[ ! -e "$item" ]] && continue
         local name
         name="$(basename "$item")"
-
         [[ "$name" == "node_modules" ]] && continue
         [[ "$name" == ".git" ]] && continue
         [[ "$name" == ".DS_Store" ]] && continue
 
-        cp -r "$item" "$REPO_DIR/"
+        cp -r "$item" "$PROJECT_DIR/"
         items=$((items + 1))
     done
 
@@ -115,15 +121,14 @@ main() {
         [[ ! -e "$item" ]] && continue
         local name
         name="$(basename "$item")"
-
         [[ "$name" == ".git" ]] && continue
         [[ "$name" == ".DS_Store" ]] && continue
 
-        cp -r "$item" "$REPO_DIR/"
+        cp -r "$item" "$PROJECT_DIR/"
         items=$((items + 1))
     done
 
-    log_info "已同步 $items 个顶级文件/目录"
+    log_info "已同步 $items 个顶级文件/目录到 project/"
 
     echo ""
     log_info "同步完成！以下是变更摘要:"

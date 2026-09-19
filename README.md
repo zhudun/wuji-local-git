@@ -270,15 +270,18 @@ robocopy $source $dest /E /XD node_modules .git /XF *.log .DS_Store
 ├── repos/                # 无极临时下载区（gitignore 忽略，不入 Git）
 │   ├── my-app-0919/      #   每次下载放一个子目录
 │   └── my-app-0920/      #   旧的用完可删
-├── wuji-sync.sh          # 从 repos/ 拉代码到本仓库
-├── wuji-push.sh          # 从本仓库推代码回 repos/
+├── project/              # 同步目标（Git 跟踪，业务代码在这里）
+│   ├── src/
+│   ├── package.json
+│   └── ...
+├── wuji-sync.sh          # 从 repos/ 同步到 project/
+├── wuji-push.sh          # 从 project/ 推回 repos/
 ├── .wuji-sync-ignore     # 同步排除规则
 ├── .cursorrules          # Cursor AI 规则
 ├── AI-GUIDE.md           # 通用 AI 助手指引
 ├── QUICKSTART.md         # 快速操作手册
 ├── .gitignore            # Git 忽略规则
-├── README.md             # 本文件
-└── (你的业务代码文件)      # 从 repos/ 同步过来，Git 跟踪
+└── README.md             # 本文件
 ```
 
 ## FAQ
