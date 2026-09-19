@@ -267,8 +267,12 @@ robocopy $source $dest /E /XD node_modules .git /XF *.log .DS_Store
 
 ```
 .
-├── wuji-sync.sh          # 同步脚本（Linux/Mac/Git Bash）
+├── wuji-sync.sh          # 从无极拉代码到本仓库（Linux/Mac/Git Bash）
+├── wuji-push.sh          # 从本仓库推代码回无极
 ├── .wuji-sync-ignore     # 同步排除规则
+├── .cursorrules          # Cursor AI 规则
+├── AI-GUIDE.md           # 通用 AI 助手指引
+├── QUICKSTART.md         # 快速操作手册
 ├── .gitignore            # Git 忽略规则
 ├── README.md             # 本文件
 └── (你的无极项目文件)      # 同步进来的代码

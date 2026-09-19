@@ -90,7 +90,11 @@ detect_deleted_files() {
         [[ "$rel_path" == .git/* ]] && continue
         [[ "$rel_path" == node_modules/* ]] && continue
         [[ "$rel_path" == "wuji-sync.sh" ]] && continue
+        [[ "$rel_path" == "wuji-push.sh" ]] && continue
         [[ "$rel_path" == ".wuji-sync-ignore" ]] && continue
+        [[ "$rel_path" == ".cursorrules" ]] && continue
+        [[ "$rel_path" == "AI-GUIDE.md" ]] && continue
+        [[ "$rel_path" == "QUICKSTART.md" ]] && continue
         [[ "$rel_path" == "README.md" ]] && continue
         [[ "$rel_path" == ".gitignore" ]] && continue
 
@@ -162,7 +166,11 @@ main() {
         echo ""
         eval rsync -avn --delete "$exclude_args" \
             --exclude "wuji-sync.sh" \
+            --exclude "wuji-push.sh" \
             --exclude ".wuji-sync-ignore" \
+            --exclude ".cursorrules" \
+            --exclude "AI-GUIDE.md" \
+            --exclude "QUICKSTART.md" \
             --exclude "README.md" \
             --exclude ".gitignore" \
             "\"$source_dir/\"" "\"$REPO_DIR/\""
@@ -172,7 +180,11 @@ main() {
     log_info "正在同步文件..."
     eval rsync -av "$exclude_args" \
         --exclude "wuji-sync.sh" \
+        --exclude "wuji-push.sh" \
         --exclude ".wuji-sync-ignore" \
+        --exclude ".cursorrules" \
+        --exclude "AI-GUIDE.md" \
+        --exclude "QUICKSTART.md" \
         --exclude "README.md" \
         --exclude ".gitignore" \
         "\"$source_dir/\"" "\"$REPO_DIR/\""
