@@ -204,14 +204,7 @@ main() {
         local msg="sync: 从无极平台同步代码 ($today)"
         git commit -m "$msg"
         log_info "已提交: $msg"
-
-        read -rp "是否推送到远程？[y/N] " push_answer
-        if [[ "$push_answer" =~ ^[Yy]$ ]]; then
-            local branch
-            branch="$(git symbolic-ref --short HEAD)"
-            git push -u origin "$branch"
-            log_info "已推送到 origin/$branch"
-        fi
+        log_info "提交完成，所有历史已保存在本地 Git 仓库中。"
     else
         log_warn "变更已暂存但未提交。你可以:"
         echo "  git diff --cached     # 查看详细变更"

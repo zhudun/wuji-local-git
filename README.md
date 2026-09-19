@@ -1,4 +1,4 @@
-# 无极平台本地 Git 管理方案
+# 无极平台本地 Git 管理方案（纯本地，不上传）
 
 ## 问题背景
 
@@ -8,66 +8,79 @@
 - 无法在同一个文件夹中持续使用 Git 跟踪历史
 - 多次下载散落在不同目录，无法统一管理
 
+**约束：企业项目，代码不能上传到任何外部仓库。所有管理纯本地完成。**
+
 ## 解决方案
 
-**核心思路：维护一个永久的 Git 仓库，每次从无极下载的代码都"同步"进来。**
+**核心思路：在本地维护一个永久的 Git 仓库，每次从无极下载的代码都"同步"进来。**
 
 ```
 你的电脑
-├── wuji-git-repo/          ← 永久 Git 仓库（本仓库）
-│   ├── .git/               ← 完整的 Git 历史
-│   ├── wuji-sync.sh        ← 同步脚本
-│   ├── src/
+├── D:\projects\wuji-git-repo\    ← 永久 Git 仓库（不变的，永远在这）
+│   ├── .git\                     ← 所有版本历史都在这
+│   ├── wuji-sync.sh              ← 同步脚本
+│   ├── src\
 │   └── ...
 │
-├── wuji-download-0919/     ← 第 1 次从无极下载（临时）
-├── wuji-download-0920/     ← 第 2 次从无极下载（临时）
-└── wuji-download-0925/     ← 第 N 次从无极下载（临时）
+├── C:\wuji-workspace-0919\       ← 第 1 次无极下载（临时，用完可删）
+├── C:\wuji-workspace-0920\       ← 第 2 次无极下载（临时，用完可删）
+└── ...
 ```
 
-每次从无极下载新代码后，运行同步脚本，代码就会合入 Git 仓库并保留历史。
+Git 仓库只在你本机上，不连接任何远程服务器。`.git` 目录就是你的"版本数据库"。
 
-## 日常工作流
-
-### 初次设置
+## 初次设置
 
 ```bash
-# 1. 克隆本仓库到本地（或者直接用本目录）
-git clone <仓库地址> wuji-git-repo
-cd wuji-git-repo
+# 1. 在本地选一个固定位置创建 Git 仓库
+mkdir D:\projects\wuji-git-repo
+cd D:\projects\wuji-git-repo
+git init
 
-# 2. 第一次从无极下载代码到某个文件夹
-#    假设下载到了 ~/Downloads/wuji-project
+# 2. 把本仓库的工具文件复制进去
+#    (wuji-sync.sh, .wuji-sync-ignore, .gitignore)
 
-# 3. 运行同步
-./wuji-sync.sh ~/Downloads/wuji-project --commit
+# 3. 第一次从无极下载代码到某个文件夹（比如 C:\wuji-workspace-0919）
+
+# 4. 运行同步，把代码纳入 Git 管理
+./wuji-sync.sh C:\wuji-workspace-0919 --commit
+# 或 Windows Git Bash 下:
+# bash wuji-sync.sh /c/wuji-workspace-0919 --commit
+
+# 完成！你的第一个版本已经被 Git 记录了
 ```
 
-### 每日开发流程
+## 每日工作流
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│  1. 从无极下载代码 → ~/Downloads/wuji-0920/                  │
-│                         │                                    │
-│  2. 同步到 Git 仓库     │                                    │
-│     ./wuji-sync.sh ~/Downloads/wuji-0920                    │
-│                         │                                    │
-│  3. 在 Git 仓库中开发   │                                    │
-│     (正常 git add/commit/push)                               │
-│                         │                                    │
-│  4. 开发完成，把代码复制回无极                                  │
-│     或直接在无极中同步修改                                      │
-│                         │                                    │
-│  5. 下次再从无极下载 → 新文件夹 → 回到步骤 2                    │
-└─────────────────────────────────────────────────────────────┘
+ ┌──────────────────────────────────────────────────────────────┐
+ │                                                              │
+ │  早上：从无极下载代码 → C:\wuji-workspace-0920\              │
+ │           │                                                  │
+ │           ▼                                                  │
+ │  同步到 Git 仓库                                             │
+ │     bash wuji-sync.sh /c/wuji-workspace-0920                │
+ │           │                                                  │
+ │           ▼                                                  │
+ │  在 Git 仓库目录中开发（用 VS Code 打开这个目录）             │
+ │     git add -A && git commit -m "feat: 新增XX"               │
+ │           │                                                  │
+ │           ▼                                                  │
+ │  开发完成，把修改的文件复制回无极链接的文件夹                   │
+ │     （或在无极平台上手动同步修改）                              │
+ │           │                                                  │
+ │           ▼                                                  │
+ │  下班收工。下次连接无极 → 新文件夹 → 回到第一步                │
+ │                                                              │
+ └──────────────────────────────────────────────────────────────┘
 ```
 
 ### 具体命令
 
 ```bash
-# ============ 场景 1: 从无极下载后同步 ============
+# ============ 场景 1: 从无极下载后同步到 Git 仓库 ============
 
-# 预览将同步哪些文件（不实际操作）
+# 预览将同步哪些文件（不实际操作，先看看）
 ./wuji-sync.sh ~/Downloads/wuji-project-0919 --dry-run
 
 # 同步并查看变更
@@ -77,24 +90,31 @@ cd wuji-git-repo
 ./wuji-sync.sh ~/Downloads/wuji-project-0919 --commit
 
 
-# ============ 场景 2: 本地开发后提交 ============
+# ============ 场景 2: 在 Git 仓库中开发后提交 ============
 
-# 正常的 Git 工作流
 git add -A
 git commit -m "feat: 新增XX功能"
-git push
 
 
 # ============ 场景 3: 把本地修改同步回无极 ============
 
-# 方法 A: 直接复制整个项目（排除 .git）
+# 方法 A: 直接复制整个项目（排除 .git 和 node_modules）
 rsync -av --exclude '.git' --exclude 'node_modules' \
   ./ ~/path-to-wuji-linked-folder/
 
-# 方法 B: 只复制修改过的文件
+# 方法 B: 只复制最近一次提交修改过的文件
 git diff --name-only HEAD~1 | while read f; do
   cp "$f" ~/path-to-wuji-linked-folder/"$f"
 done
+
+
+# ============ 场景 4: 查看历史 ============
+
+git log --oneline            # 查看提交历史
+git diff HEAD~1              # 对比最近一次变更
+git diff HEAD~3 HEAD         # 对比最近 3 次变更的累积差异
+git show HEAD:src/App.vue    # 查看某个文件的某个历史版本
+git checkout HEAD~2 -- src/  # 恢复某个目录到 2 次提交前的状态
 ```
 
 ## 脚本说明
@@ -115,6 +135,7 @@ done
 - 自动排除 `.git`、`node_modules` 等目录
 - 检测在无极端被删除的文件并询问是否同步删除
 - 同步完成后显示变更摘要（git diff）
+- **纯本地操作，不涉及任何网络传输**
 
 ### `.wuji-sync-ignore`
 
@@ -123,13 +144,19 @@ done
 
 ## 进阶技巧
 
-### 1. 用分支管理不同版本
+### 1. 用分支管理不同功能
 
 ```bash
-# 无极上有多个版本/环境？用分支区分
+# 开发新功能时创建分支
 git checkout -b feature/new-page
 # ... 开发 ...
+git add -A && git commit -m "feat: 新页面"
+
+# 切回主分支
 git checkout main
+
+# 合并功能分支
+git merge feature/new-page
 ```
 
 ### 2. 设置别名简化操作
@@ -137,7 +164,7 @@ git checkout main
 在 `~/.bashrc` 或 `~/.zshrc` 中添加：
 
 ```bash
-alias wsync='/path/to/wuji-git-repo/wuji-sync.sh'
+alias wsync='bash /d/projects/wuji-git-repo/wuji-sync.sh'
 
 # 然后就可以在任何地方运行
 wsync ~/Downloads/wuji-latest --commit
@@ -145,31 +172,47 @@ wsync ~/Downloads/wuji-latest --commit
 
 ### 3. 配合 VS Code 使用
 
-推荐始终在 Git 仓库目录中打开 VS Code 进行开发：
+**始终在 Git 仓库目录中打开 VS Code**，而不是在无极下载的临时目录中打开：
 
 ```bash
-code /path/to/wuji-git-repo
+code D:\projects\wuji-git-repo
 ```
 
-这样可以利用 VS Code 的 Git 面板查看变更、提交代码、解决冲突。
+好处：
+- 左侧源代码管理面板可以看到所有变更
+- 可以逐行查看 diff
+- 可以可视化地回退、对比历史版本
+- Timeline 面板可以看到每个文件的修改时间线
 
-### 4. 自动备份到远程
+### 4. 本地备份策略
+
+代码不能上传，但本地也要防丢失：
 
 ```bash
-# 推送到 GitHub/Gitee 作为备份
-git remote add origin https://github.com/yourname/wuji-project.git
-git push -u origin main
+# 方法 A: 定期复制整个仓库到另一个磁盘/U盘
+# （.git 目录包含完整历史，复制它就等于备份了一切）
+xcopy /E /I D:\projects\wuji-git-repo E:\backup\wuji-git-repo
+# 或 Linux/Mac:
+cp -r /path/to/wuji-git-repo /media/usb-drive/backup/
+
+# 方法 B: 用 git bundle 打包成单文件（更紧凑，方便存档）
+cd D:\projects\wuji-git-repo
+git bundle create ../wuji-backup-$(date +%Y%m%d).bundle --all
+# 生成的 .bundle 文件包含完整仓库，可以存到加密U盘等安全位置
+
+# 从 bundle 恢复：
+git clone wuji-backup-20260919.bundle wuji-git-repo-restored
 ```
 
 ### 5. 处理冲突的情况
 
-如果你在本地 Git 仓库中做了修改，同时无极端也有别人的修改：
+如果你在本地做了修改，同时无极端（或同事）也有修改：
 
 ```bash
 # 先提交本地修改
 git add -A && git commit -m "本地修改"
 
-# 创建临时分支保存无极端的状态
+# 创建临时分支来接收无极端的版本
 git checkout -b wuji-sync-0920
 
 # 同步无极代码
@@ -179,14 +222,52 @@ git checkout -b wuji-sync-0920
 git checkout main
 git merge wuji-sync-0920
 
-# 解决冲突（如果有）后提交
+# 如果有冲突，VS Code 会高亮显示，手动解决后提交
+git add -A && git commit -m "merge: 合并无极端和本地修改"
+
+# 可以删除临时分支
+git branch -d wuji-sync-0920
+```
+
+### 6. 用 tag 标记重要版本
+
+```bash
+# 发版、上线、里程碑时打标签
+git tag -a v1.0.0 -m "第一次上线版本"
+git tag -a v1.1.0 -m "新增XX功能后的版本"
+
+# 查看所有标签
+git tag -l
+
+# 回到某个标记的版本
+git checkout v1.0.0
+```
+
+## Windows 用户注意事项
+
+如果你在 Windows 上使用：
+
+1. **安装 Git for Windows**：https://git-scm.com/download/win ，安装时自带 Git Bash
+2. **在 Git Bash 中运行脚本**：`bash wuji-sync.sh /c/path/to/download`
+3. **路径格式**：Git Bash 中用 `/c/Users/xxx` 代替 `C:\Users\xxx`
+4. **rsync**：Git Bash 自带 rsync；如果没有，可以用 MSYS2 安装
+
+或者如果你习惯用 PowerShell，可以直接用文件复制命令代替 rsync：
+
+```powershell
+# PowerShell 版本的简易同步（不需要 rsync）
+$source = "C:\wuji-workspace-0920"
+$dest = "D:\projects\wuji-git-repo"
+
+# 复制文件（排除 node_modules 等）
+robocopy $source $dest /E /XD node_modules .git /XF *.log .DS_Store
 ```
 
 ## 目录结构说明
 
 ```
 .
-├── wuji-sync.sh          # 同步脚本
+├── wuji-sync.sh          # 同步脚本（Linux/Mac/Git Bash）
 ├── .wuji-sync-ignore     # 同步排除规则
 ├── .gitignore            # Git 忽略规则
 ├── README.md             # 本文件
@@ -196,13 +277,30 @@ git merge wuji-sync-0920
 ## FAQ
 
 **Q: 同步会覆盖我本地的修改吗？**
-A: 会。同步操作是以无极下载的版本为准覆盖本仓库。建议同步前先提交本地修改（`git commit`），这样即使覆盖了也能通过 `git diff` 或 `git revert` 找回。
+
+会。同步操作以无极下载的版本为准覆盖本仓库。所以建议：**同步前先 `git commit` 提交本地修改**。即使被覆盖，也能通过 `git diff` 或 `git checkout` 找回任何历史版本。
 
 **Q: 我可以删除无极下载的临时文件夹吗？**
-A: 同步完成后可以安全删除。所有代码和历史都保存在 Git 仓库中了。
+
+同步完成后可以放心删除。Git 仓库里已经有完整记录了。这些临时文件夹只是"中转站"。
+
+**Q: .git 目录有多大？会不会太占空间？**
+
+一般前端项目的 .git 目录不会超过几百 MB（即使有很长的历史）。Git 内部有高效的压缩算法。如果觉得太大，可以定期运行 `git gc` 压缩。
+
+**Q: 电脑坏了/重装系统怎么办？**
+
+定期用 `git bundle` 备份到U盘或公司内网存储（参见"本地备份策略"一节）。一个 `.bundle` 文件就包含了完整的仓库和所有历史。
 
 **Q: 多人协作怎么办？**
-A: 每个人维护自己的 Git 仓库，推送到同一个远程仓库（GitHub/Gitee），用 Git 的标准协作流程（pull/merge/rebase）管理。
 
-**Q: 无极平台的配置文件需要同步吗？**
-A: 看情况。平台特有的配置文件（如部署配置）如果对开发没用，可以加到 `.wuji-sync-ignore` 中排除。
+纯本地的方案下，可以用 `git bundle` 文件通过公司内网/共享盘交换：
+```bash
+# 同事 A 导出
+git bundle create changes.bundle main
+
+# 同事 B 导入
+git fetch changes.bundle main:from-colleague-a
+git merge from-colleague-a
+```
+或者如果公司有内网 GitLab/Gitea，可以作为内部远程仓库使用（代码不出内网）。
