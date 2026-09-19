@@ -294,7 +294,7 @@ robocopy $source $dest /E /XD node_modules .git /XF *.log .DS_Store
 
 **Q: 多人协作怎么办？**
 
-纯本地的方案下，可以用 `git bundle` 文件通过公司内网/共享盘交换：
+纯本地的方案下，可以用 `git bundle` 文件通过公司内网共享盘交换：
 ```bash
 # 同事 A 导出
 git bundle create changes.bundle main
@@ -303,4 +303,3 @@ git bundle create changes.bundle main
 git fetch changes.bundle main:from-colleague-a
 git merge from-colleague-a
 ```
-或者如果公司有内网 GitLab/Gitea，可以作为内部远程仓库使用（代码不出内网）。
