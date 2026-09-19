@@ -1,0 +1,18 @@
+# wuji-sync 自定义排除规则
+# 每行一个 pattern，支持通配符，# 开头为注释
+#
+# 示例:
+# dist/
+# build/
+# *.map
+# .env.local
+
+# 常见需要排除的目录/文件
+node_modules
+.DS_Store
+Thumbs.db
+*.log
+dist
+build
+.cache
+.temp
