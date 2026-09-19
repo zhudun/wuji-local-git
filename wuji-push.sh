@@ -12,11 +12,10 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_DIR="$SCRIPT_DIR"
 
-SKIP_FILES="wuji-sync.sh wuji-sync.cmd wuji-push.sh wuji-push.cmd
+SKIP_NAMES="wuji-sync.sh wuji-sync.cmd wuji-push.sh wuji-push.cmd
 .wuji-sync-ignore .cursorrules .gitignore
-AI-GUIDE.md QUICKSTART.md README.md"
-
-SKIP_DIRS="repos .git node_modules"
+AI-GUIDE.md QUICKSTART.md README.md
+repos .git node_modules .DS_Store Thumbs.db"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -45,21 +44,11 @@ log_info()  { echo -e "${GREEN}[OK]${NC} $*"; }
 log_warn()  { echo -e "${YELLOW}[!!]${NC} $*"; }
 log_error() { echo -e "${RED}[ERR]${NC} $*"; }
 
-should_skip() {
-    local rel="$1"
-
-    for f in $SKIP_FILES; do
-        [[ "$rel" == "$f" ]] && return 0
+is_skip() {
+    local name="$1"
+    for s in $SKIP_NAMES; do
+        [[ "$name" == "$s" ]] && return 0
     done
-
-    for d in $SKIP_DIRS; do
-        [[ "$rel" == "$d" || "$rel" == "$d"/* ]] && return 0
-    done
-
-    local base
-    base="$(basename "$rel")"
-    [[ "$base" == ".DS_Store" || "$base" == "Thumbs.db" ]] && return 0
-
     return 1
 }
 
@@ -105,13 +94,12 @@ main() {
         fi
 
         log_info "最近一次提交修改的文件:"
-        local count=0
-
         echo "$files" | while IFS= read -r f; do
-            should_skip "$f" && continue
+            is_skip "$(basename "$f")" && continue
+            is_skip "$f" && continue
+            [[ "$f" == repos/* ]] && continue
             echo "  $f"
         done
-
         echo ""
 
         if $dry_run; then
@@ -120,7 +108,9 @@ main() {
         fi
 
         echo "$files" | while IFS= read -r f; do
-            should_skip "$f" && continue
+            is_skip "$(basename "$f")" && continue
+            is_skip "$f" && continue
+            [[ "$f" == repos/* ]] && continue
 
             if [[ -f "$REPO_DIR/$f" ]]; then
                 local dir
@@ -133,30 +123,43 @@ main() {
             fi
         done
     else
-        local count=0
+        local items=0
 
-        while IFS= read -r -d '' file; do
-            local rel="${file#$REPO_DIR/}"
-            should_skip "$rel" && continue
+        for item in "$REPO_DIR"/*; do
+            [[ ! -e "$item" ]] && continue
+            local name
+            name="$(basename "$item")"
+            is_skip "$name" && continue
 
             if $dry_run; then
-                echo "  $rel"
+                echo "  $name"
             else
-                local dir
-                dir="$(dirname "$target_dir/$rel")"
-                mkdir -p "$dir"
-                cp "$file" "$target_dir/$rel"
+                cp -r "$item" "$target_dir/"
             fi
-            count=$((count + 1))
-        done < <(find "$REPO_DIR" -type f -not -path "$REPO_DIR/.git/*" -print0 2>/dev/null)
+            items=$((items + 1))
+        done
+
+        for item in "$REPO_DIR"/.[!.]*; do
+            [[ ! -e "$item" ]] && continue
+            local name
+            name="$(basename "$item")"
+            is_skip "$name" && continue
+
+            if $dry_run; then
+                echo "  $name"
+            else
+                cp -r "$item" "$target_dir/"
+            fi
+            items=$((items + 1))
+        done
 
         if $dry_run; then
             echo ""
-            log_info "预览完成，共 $count 个文件。"
+            log_info "预览完成，共 $items 个顶级文件/目录。"
             exit 0
         fi
 
-        log_info "已复制 $count 个文件"
+        log_info "已复制 $items 个顶级文件/目录"
     fi
 
     echo ""

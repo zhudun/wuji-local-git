@@ -12,14 +12,6 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_DIR="$SCRIPT_DIR"
 
-SKIP_NAMES=".git node_modules .DS_Store Thumbs.db"
-
-SKIP_FILES="wuji-sync.sh wuji-sync.cmd wuji-push.sh wuji-push.cmd
-.wuji-sync-ignore .cursorrules .gitignore
-AI-GUIDE.md QUICKSTART.md README.md"
-
-SKIP_DIRS="repos"
-
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -46,107 +38,6 @@ EOF
 log_info()  { echo -e "${GREEN}[OK]${NC} $*"; }
 log_warn()  { echo -e "${YELLOW}[!!]${NC} $*"; }
 log_error() { echo -e "${RED}[ERR]${NC} $*"; }
-
-should_skip_name() {
-    local name="$1"
-    for skip in $SKIP_NAMES; do
-        [[ "$name" == "$skip" ]] && return 0
-    done
-    return 1
-}
-
-should_skip_path() {
-    local rel="$1"
-
-    for f in $SKIP_FILES; do
-        [[ "$rel" == "$f" ]] && return 0
-    done
-
-    for d in $SKIP_DIRS; do
-        [[ "$rel" == "$d" || "$rel" == "$d"/* ]] && return 0
-    done
-
-    local ignore_file="$REPO_DIR/.wuji-sync-ignore"
-    if [[ -f "$ignore_file" ]]; then
-        while IFS= read -r line || [[ -n "$line" ]]; do
-            line="$(echo "$line" | sed 's/#.*//' | xargs)"
-            [[ -z "$line" ]] && continue
-            # shellcheck disable=SC2254
-            case "$rel" in
-                $line|$line/*) return 0 ;;
-            esac
-            local base
-            base="$(basename "$rel")"
-            # shellcheck disable=SC2254
-            case "$base" in
-                $line) return 0 ;;
-            esac
-        done < "$ignore_file"
-    fi
-
-    return 1
-}
-
-copy_tree() {
-    local src="$1"
-    local dst="$2"
-    local mode="$3"
-    local count=0
-
-    while IFS= read -r -d '' file; do
-        local rel="${file#$src/}"
-
-        should_skip_name "$(basename "$rel")" && continue
-        should_skip_path "$rel" && continue
-
-        if [[ "$mode" == "dry" ]]; then
-            echo "  $rel"
-            count=$((count + 1))
-        else
-            local target_dir
-            target_dir="$(dirname "$dst/$rel")"
-            mkdir -p "$target_dir"
-            cp "$file" "$dst/$rel"
-            count=$((count + 1))
-        fi
-    done < <(find "$src" -type f -print0 2>/dev/null)
-
-    echo "$count"
-}
-
-detect_deleted_files() {
-    local source_dir="$1"
-    local deleted=()
-
-    while IFS= read -r -d '' file; do
-        local rel="${file#$REPO_DIR/}"
-
-        should_skip_name "$(basename "$rel")" && continue
-        should_skip_path "$rel" && continue
-
-        if [[ ! -e "$source_dir/$rel" ]]; then
-            deleted+=("$rel")
-        fi
-    done < <(find "$REPO_DIR" -type f -not -path "$REPO_DIR/.git/*" -print0 2>/dev/null)
-
-    if [[ ${#deleted[@]} -gt 0 ]]; then
-        echo ""
-        log_warn "以下文件在无极下载中不存在（可能已被删除）:"
-        for f in "${deleted[@]}"; do
-            echo -e "  ${RED}-${NC} $f"
-        done
-        echo ""
-        read -rp "是否删除这些文件？[y/N] " answer
-        if [[ "$answer" =~ ^[Yy]$ ]]; then
-            for f in "${deleted[@]}"; do
-                rm -f "$REPO_DIR/$f"
-                log_info "已删除: $f"
-            done
-        else
-            log_info "保留了这些文件"
-        fi
-    fi
-}
 
 main() {
     if [[ $# -lt 1 ]] || [[ "$1" == "--help" ]] || [[ "$1" == "-h" ]]; then
@@ -185,20 +76,54 @@ main() {
     echo ""
 
     if $dry_run; then
-        log_info "预览模式 (不实际修改文件):"
+        log_info "预览模式 — 以下是源目录中的内容:"
         echo ""
-        copy_tree "$source_dir" "$REPO_DIR" "dry" > /dev/null
+        find "$source_dir" -type f \
+            -not -path "*/node_modules/*" \
+            -not -path "*/.git/*" \
+            -not -name ".DS_Store" \
+            -not -name "Thumbs.db" \
+            | sed "s|^$source_dir/||" \
+            | head -50
+        local total
+        total="$(find "$source_dir" -type f \
+            -not -path "*/node_modules/*" \
+            -not -path "*/.git/*" \
+            | wc -l | tr -d ' ')"
         echo ""
-        log_info "预览完成。"
+        log_info "共 $total 个文件。（仅显示前 50 个）"
         exit 0
     fi
 
     log_info "正在同步文件..."
-    local copied
-    copied="$(copy_tree "$source_dir" "$REPO_DIR" "copy")"
-    log_info "已复制 $copied 个文件"
 
-    detect_deleted_files "$source_dir"
+    local items=0
+    for item in "$source_dir"/*; do
+        [[ ! -e "$item" ]] && continue
+        local name
+        name="$(basename "$item")"
+
+        [[ "$name" == "node_modules" ]] && continue
+        [[ "$name" == ".git" ]] && continue
+        [[ "$name" == ".DS_Store" ]] && continue
+
+        cp -r "$item" "$REPO_DIR/"
+        items=$((items + 1))
+    done
+
+    for item in "$source_dir"/.[!.]*; do
+        [[ ! -e "$item" ]] && continue
+        local name
+        name="$(basename "$item")"
+
+        [[ "$name" == ".git" ]] && continue
+        [[ "$name" == ".DS_Store" ]] && continue
+
+        cp -r "$item" "$REPO_DIR/"
+        items=$((items + 1))
+    done
+
+    log_info "已同步 $items 个顶级文件/目录"
 
     echo ""
     log_info "同步完成！以下是变更摘要:"
