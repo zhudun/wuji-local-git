@@ -3,26 +3,22 @@
 # wuji-sync.sh — 将无极平台下载的代码同步到本 Git 仓库
 #
 # 用法:
-#   ./wuji-sync.sh /path/to/wuji-download          # 同步并查看 diff
-#   ./wuji-sync.sh /path/to/wuji-download --commit  # 同步并自动提交
-#   ./wuji-sync.sh --help                            # 查看帮助
-#
-# 原理:
-#   用 rsync 将无极下载目录的文件覆盖到本仓库（排除 .git 和自定义忽略项），
-#   然后用 git diff 展示变更。加 --commit 可自动生成一次提交。
+#   ./wuji-sync.sh repos/my-project          # 同步并查看 diff
+#   ./wuji-sync.sh repos/my-project --commit  # 同步并自动提交
+#   ./wuji-sync.sh --help                     # 查看帮助
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_DIR="$SCRIPT_DIR"
 
-EXCLUDE_PATTERNS=(
-    ".git"
-    "node_modules"
-    ".DS_Store"
-    "Thumbs.db"
-    "*.log"
-)
+SKIP_NAMES=".git node_modules .DS_Store Thumbs.db"
+
+SKIP_FILES="wuji-sync.sh wuji-sync.cmd wuji-push.sh wuji-push.cmd
+.wuji-sync-ignore .cursorrules .gitignore
+AI-GUIDE.md QUICKSTART.md README.md"
+
+SKIP_DIRS="repos"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -40,32 +36,34 @@ ${YELLOW}用法:${NC}
   $0 <无极下载目录> --dry-run    仅预览将同步的文件，不实际操作
   $0 --help                     显示帮助
 
-${YELLOW}工作流程:${NC}
-  1. 从无极平台下载代码到本地（每次可能是不同文件夹）
-  2. 运行本脚本，指定下载目录
-  3. 脚本将文件同步到本 Git 仓库，保留完整 Git 历史
-  4. 查看 diff，确认无误后提交
-
 ${YELLOW}示例:${NC}
-  $0 ~/Downloads/wuji-project-0919
-  $0 ~/Downloads/wuji-project-0919 --commit
-  $0 ~/Desktop/新建文件夹/my-app --dry-run
-
-${YELLOW}注意:${NC}
-  - 同步会覆盖本仓库中的同名文件
-  - .git 目录、node_modules 等会被自动排除
-  - 如需自定义排除规则，编辑 .wuji-sync-ignore 文件
+  $0 repos/my-app-0919
+  $0 repos/my-app-0919 --commit
+  $0 repos/my-app-0919 --dry-run
 EOF
 }
 
-log_info()  { echo -e "${GREEN}[✓]${NC} $*"; }
-log_warn()  { echo -e "${YELLOW}[!]${NC} $*"; }
-log_error() { echo -e "${RED}[✗]${NC} $*"; }
+log_info()  { echo -e "${GREEN}[OK]${NC} $*"; }
+log_warn()  { echo -e "${YELLOW}[!!]${NC} $*"; }
+log_error() { echo -e "${RED}[ERR]${NC} $*"; }
 
-build_exclude_args() {
-    local args=()
-    for pattern in "${EXCLUDE_PATTERNS[@]}"; do
-        args+=(--exclude "$pattern")
+should_skip_name() {
+    local name="$1"
+    for skip in $SKIP_NAMES; do
+        [[ "$name" == "$skip" ]] && return 0
+    done
+    return 1
+}
+
+should_skip_path() {
+    local rel="$1"
+
+    for f in $SKIP_FILES; do
+        [[ "$rel" == "$f" ]] && return 0
+    done
+
+    for d in $SKIP_DIRS; do
+        [[ "$rel" == "$d" || "$rel" == "$d"/* ]] && return 0
     done
 
     local ignore_file="$REPO_DIR/.wuji-sync-ignore"
@@ -73,36 +71,63 @@ build_exclude_args() {
         while IFS= read -r line || [[ -n "$line" ]]; do
             line="$(echo "$line" | sed 's/#.*//' | xargs)"
             [[ -z "$line" ]] && continue
-            args+=(--exclude "$line")
+            # shellcheck disable=SC2254
+            case "$rel" in
+                $line|$line/*) return 0 ;;
+            esac
+            local base
+            base="$(basename "$rel")"
+            # shellcheck disable=SC2254
+            case "$base" in
+                $line) return 0 ;;
+            esac
         done < "$ignore_file"
     fi
 
-    echo "${args[@]}"
+    return 1
+}
+
+copy_tree() {
+    local src="$1"
+    local dst="$2"
+    local mode="$3"
+    local count=0
+
+    while IFS= read -r -d '' file; do
+        local rel="${file#$src/}"
+
+        should_skip_name "$(basename "$rel")" && continue
+        should_skip_path "$rel" && continue
+
+        if [[ "$mode" == "dry" ]]; then
+            echo "  $rel"
+            count=$((count + 1))
+        else
+            local target_dir
+            target_dir="$(dirname "$dst/$rel")"
+            mkdir -p "$target_dir"
+            cp "$file" "$dst/$rel"
+            count=$((count + 1))
+        fi
+    done < <(find "$src" -type f -print0 2>/dev/null)
+
+    echo "$count"
 }
 
 detect_deleted_files() {
     local source_dir="$1"
     local deleted=()
 
-    while IFS= read -r file; do
-        local rel_path="${file#$REPO_DIR/}"
+    while IFS= read -r -d '' file; do
+        local rel="${file#$REPO_DIR/}"
 
-        [[ "$rel_path" == .git/* ]] && continue
-        [[ "$rel_path" == repos/* ]] && continue
-        [[ "$rel_path" == node_modules/* ]] && continue
-        [[ "$rel_path" == "wuji-sync.sh" ]] && continue
-        [[ "$rel_path" == "wuji-push.sh" ]] && continue
-        [[ "$rel_path" == ".wuji-sync-ignore" ]] && continue
-        [[ "$rel_path" == ".cursorrules" ]] && continue
-        [[ "$rel_path" == "AI-GUIDE.md" ]] && continue
-        [[ "$rel_path" == "QUICKSTART.md" ]] && continue
-        [[ "$rel_path" == "README.md" ]] && continue
-        [[ "$rel_path" == ".gitignore" ]] && continue
+        should_skip_name "$(basename "$rel")" && continue
+        should_skip_path "$rel" && continue
 
-        if [[ ! -e "$source_dir/$rel_path" ]]; then
-            deleted+=("$rel_path")
+        if [[ ! -e "$source_dir/$rel" ]]; then
+            deleted+=("$rel")
         fi
-    done < <(find "$REPO_DIR" -type f -not -path "$REPO_DIR/.git/*")
+    done < <(find "$REPO_DIR" -type f -not -path "$REPO_DIR/.git/*" -print0 2>/dev/null)
 
     if [[ ${#deleted[@]} -gt 0 ]]; then
         echo ""
@@ -155,9 +180,6 @@ main() {
         exit 1
     fi
 
-    local exclude_args
-    exclude_args="$(build_exclude_args)"
-
     log_info "源目录 (无极下载): $source_dir"
     log_info "目标仓库:          $REPO_DIR"
     echo ""
@@ -165,38 +187,22 @@ main() {
     if $dry_run; then
         log_info "预览模式 (不实际修改文件):"
         echo ""
-        eval rsync -avn --delete "$exclude_args" \
-            --exclude "repos" \
-            --exclude "wuji-sync.sh" \
-            --exclude "wuji-push.sh" \
-            --exclude ".wuji-sync-ignore" \
-            --exclude ".cursorrules" \
-            --exclude "AI-GUIDE.md" \
-            --exclude "QUICKSTART.md" \
-            --exclude "README.md" \
-            --exclude ".gitignore" \
-            "\"$source_dir/\"" "\"$REPO_DIR/\""
+        copy_tree "$source_dir" "$REPO_DIR" "dry" > /dev/null
+        echo ""
+        log_info "预览完成。"
         exit 0
     fi
 
     log_info "正在同步文件..."
-    eval rsync -av "$exclude_args" \
-        --exclude "repos" \
-        --exclude "wuji-sync.sh" \
-        --exclude "wuji-push.sh" \
-        --exclude ".wuji-sync-ignore" \
-        --exclude ".cursorrules" \
-        --exclude "AI-GUIDE.md" \
-        --exclude "QUICKSTART.md" \
-        --exclude "README.md" \
-        --exclude ".gitignore" \
-        "\"$source_dir/\"" "\"$REPO_DIR/\""
+    local copied
+    copied="$(copy_tree "$source_dir" "$REPO_DIR" "copy")"
+    log_info "已复制 $copied 个文件"
 
     detect_deleted_files "$source_dir"
 
     echo ""
     log_info "同步完成！以下是变更摘要:"
-    echo "─────────────────────────────────────"
+    echo "---"
 
     cd "$REPO_DIR"
     git add -A
@@ -210,7 +216,7 @@ main() {
     fi
 
     echo "$stat_output"
-    echo "─────────────────────────────────────"
+    echo "---"
     echo ""
 
     if $auto_commit; then
