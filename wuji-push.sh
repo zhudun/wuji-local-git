@@ -18,6 +18,11 @@ TOOL_FILES=(
     ".wuji-sync-ignore"
     ".cursorrules"
     "AI-GUIDE.md"
+    "QUICKSTART.md"
+)
+
+TOOL_DIRS=(
+    "repos"
 )
 
 RED='\033[0;31m'
@@ -124,6 +129,9 @@ main() {
         )
         for tool in "${TOOL_FILES[@]}"; do
             exclude_args+=(--exclude "$tool")
+        done
+        for dir in "${TOOL_DIRS[@]}"; do
+            exclude_args+=(--exclude "$dir")
         done
         exclude_args+=(--exclude "README.md" --exclude ".gitignore")
 

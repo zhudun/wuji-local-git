@@ -1,3 +1,7 @@
+# 无极临时下载目录（只保留目录结构，不跟踪里面的内容）
+repos/*
+!repos/.gitkeep
+
 node_modules/
 dist/
 build/

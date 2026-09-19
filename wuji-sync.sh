@@ -88,6 +88,7 @@ detect_deleted_files() {
         local rel_path="${file#$REPO_DIR/}"
 
         [[ "$rel_path" == .git/* ]] && continue
+        [[ "$rel_path" == repos/* ]] && continue
         [[ "$rel_path" == node_modules/* ]] && continue
         [[ "$rel_path" == "wuji-sync.sh" ]] && continue
         [[ "$rel_path" == "wuji-push.sh" ]] && continue
@@ -165,6 +166,7 @@ main() {
         log_info "预览模式 (不实际修改文件):"
         echo ""
         eval rsync -avn --delete "$exclude_args" \
+            --exclude "repos" \
             --exclude "wuji-sync.sh" \
             --exclude "wuji-push.sh" \
             --exclude ".wuji-sync-ignore" \
@@ -179,6 +181,7 @@ main() {
 
     log_info "正在同步文件..."
     eval rsync -av "$exclude_args" \
+        --exclude "repos" \
         --exclude "wuji-sync.sh" \
         --exclude "wuji-push.sh" \
         --exclude ".wuji-sync-ignore" \
